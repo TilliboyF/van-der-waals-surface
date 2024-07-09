@@ -6,7 +6,7 @@ create the virtual environment with:
   python3 -m venv .venv
 ```
 
-# activate the environemnt:
+# Activate the environment:
 
 ## Windows:
 ```

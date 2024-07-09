@@ -1,23 +1,25 @@
 from Dcel import DCEL, Face, HalfEdge, Vertex
 import numpy as np
-import tetraeder
+import Tetraeder as tetraeder
 import plotly.graph_objects as go
 
 
 class Sphere(DCEL):
 
-    def __init__(self,
-                 c: list[float] = [0, 0, 0],
-                 r: float = 1.0,
-                 name: str = "",
-                 color: str = "") -> None:
+    def __init__(
+        self,
+        c: list[float] = [0, 0, 0],
+        r: float = 1.0,
+        name: str = "",
+        color: str = "",
+    ) -> None:
         super().__init__(center=c, color=color)
         self.r = r
         dcel = tetraeder.build(c, r)
         self.edges = dcel.edges
         self.faces = dcel.faces
         self.vertices = dcel.vertices
-        self.name= name
+        self.name = name
 
     def __eq__(self, value: object) -> bool:
         return self.name == value.name
@@ -25,6 +27,7 @@ class Sphere(DCEL):
     # Die Hauptmethode, die vollständig für das triangulieren zuständig ist und dafür sorgt, wie oft trianguliert werden soll.
     def triangulate(self, n: int = 1):
         for i in range(n - 1):
+            print("tria")
             self._stepTriangulte(i == 0)
 
     # die Methode, welche einmal trianguliert
@@ -43,7 +46,9 @@ class Sphere(DCEL):
                 self.add_vertex(newVertex)
 
                 # Erzeugen der neuen Halbkanten
-                newEdge1, newEdge2 = self._create_new_half_edges(newVertex=newVertex, h=h)
+                newEdge1, newEdge2 = self._create_new_half_edges(
+                    newVertex=newVertex, h=h
+                )
                 newEdges.extend([newEdge1, newEdge2])
 
         self._reset_edges()
@@ -51,8 +56,7 @@ class Sphere(DCEL):
         self._update_faces(isFirst)
 
     # Die Methode bringt einen neu erzeugten Punkt auf den Kugel Radius
-    def _move_on_Sphere(self,
-                        coords: list[float]) -> list[float]:
+    def _move_on_Sphere(self, coords: list[float]) -> list[float]:
         offset = coords - self.center
         normalized_offset = offset / np.linalg.norm(offset)
         return self.center + self.r * normalized_offset
@@ -63,8 +67,9 @@ class Sphere(DCEL):
             h.done = False
 
     # Diese Methode fügt die neue Ecke in der Mitte von 2 Ecken ein und verbindet die Halbkanten korrekt und erzeugt 2 neue Halbkanten
-    def _create_new_half_edges(self,
-                               newVertex: Vertex, h: HalfEdge) -> tuple[HalfEdge, HalfEdge]:
+    def _create_new_half_edges(
+        self, newVertex: Vertex, h: HalfEdge
+    ) -> tuple[HalfEdge, HalfEdge]:
         newEdge1 = HalfEdge(newVertex)
         newEdge1.done = True
         newEdge1.next = h.next
@@ -316,5 +321,5 @@ class Sphere(DCEL):
 
         self.add_faces(newFaces)
 
-    def get_line_trace(self, color: str)-> go.Scatter3d:
+    def get_line_trace(self, color: str) -> go.Scatter3d:
         return super().get_line_trace(color=color, name=self.name)

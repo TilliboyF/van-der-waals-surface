@@ -1,68 +1,92 @@
 import numpy as np
-from Dcel import DCEL,  HalfEdge, Intersection_Data, Vertex
-from IntersectionPlane import Intersection_Plane
-from Common import Insert_Cases, Multi_Vertex_Edge, Position_Cases
+from Dcel import DCEL, HalfEdge, Vertex
+from IntersectionPlane import IntersectionPlane
+from Common import Insert_Cases, Position_Cases
 from Sphere import Sphere
 import plotly.graph_objects as go
 
-class Intersection_Circle(DCEL):
 
-    def __init__(self, plane: Intersection_Plane, name:str = "") -> None:
+class IntersectionCircle(DCEL):
+    """
+    Der Schnittkreis, der eine DCEL ist
+    """
+
+    def __init__(self, plane: IntersectionPlane, name: str = "") -> None:
         super().__init__(center=plane.p)
-        self.plane: Intersection_Plane = plane
+        self.plane: IntersectionPlane = plane
         self.name = name
 
     def calc_intersection_points(self, insert: bool = True):
+        """
+        Methode berechnet die Schnittpunkte der beiden Kugeln der Schnittebene (Kapitel 5.2.2)
+        """
         s1: Sphere = self.plane.s1
         s2: Sphere = self.plane.s2
 
-        s1_points = s1.calc_intersections(self.plane,plane_side_val=-1, insert=insert)
-        s2_points = s2.calc_intersections(self.plane,plane_side_val=1, insert=insert)
+        s1_points = s1.calc_intersections(
+            plane=self.plane, plane_side_val=-1, insert=insert
+        )
+        s2_points = s2.calc_intersections(
+            plane=self.plane, plane_side_val=1, insert=insert
+        )
 
-        self.vertices= s1_points + s2_points
+        self.vertices = (
+            s1_points + s2_points
+        )  # Schnittpunkte werden in den Schnittkreis eingefügt
 
     def sort_intersection_points(self) -> None:
+        """
+        Methode sortiert die Schnittpunkte des Schnittkreises im
+        Kreis herum, wie in Kapitel 5.2.4 erklärt
+        """
         if len(self.vertices) == 0:
-            print("vertecies len 0")
             return
+
+        # projezierung der Punkte
         N = [self.plane.alpha, self.plane.beta, self.plane.gamma]
-        # V1 = self.plane.find_point_on_plane() - self.center
         V1 = self.vertices[0].coords - self.center
         V2 = np.cross(N, V1)
 
         N1 = V1 / np.linalg.norm(V1)
         N2 = V2 / np.linalg.norm(V2)
 
-        # T = np.transpose([N1, N2])
-
         for p in self.vertices:
-            coords_2d = [N1[0] * p.coords[0] + N1[1] * p.coords[1] + N1[2] * p.coords[2],
-                        N2[0] * p.coords[0] + N2[1] * p.coords[1] + N2[2] * p.coords[2]]
+            coords_2d = [
+                N1[0] * p.coords[0] + N1[1] * p.coords[1] + N1[2] * p.coords[2],
+                N2[0] * p.coords[0] + N2[1] * p.coords[1] + N2[2] * p.coords[2],
+            ]
             p.intersection_data.angle = np.arctan2(coords_2d[0], coords_2d[1])
 
+        # sortieren
         self.vertices.sort()
 
-    def insert_circle(self) -> list[Multi_Vertex_Edge]:
-        multi_edges: list[Multi_Vertex_Edge] = []
-
+    def insert_circle(self) -> None:
+        """
+        Verbinden der Schnittpunkte wie in Kapitel 5.2.5 gezeigt
+        """
         for i in range(len(self.vertices)):
             v1 = self.vertices[i]
-            last_insert = ((i+1) % len(self.vertices)) == 0
+            last_insert = ((i + 1) % len(self.vertices)) == 0
             first_insert = i == 0
-            v2 = self.vertices[(i+1) % len(self.vertices)]
+            v2 = self.vertices[(i + 1) % len(self.vertices)]
 
-            e1 = HalfEdge(v1)
-            e2 = HalfEdge(v2)
+            e1 = HalfEdge(origin=v1)
+            e2 = HalfEdge(origin=v2)
 
             e1.twin = e2
             e2.twin = e1
 
-            insert_case: Insert_Cases = Insert_Cases.LAST if last_insert else Insert_Cases.FIRST if first_insert else Insert_Cases.NORMAL
+            # Prüfung, ob normaler, letzter oder erster Fall
+            insert_case: Insert_Cases = (
+                Insert_Cases.LAST
+                if last_insert
+                else Insert_Cases.FIRST if first_insert else Insert_Cases.NORMAL
+            )
 
+            v1_side_value: float = self.plane.side_check(p=v1.edge.twin.origin.coords)
+            v2_side_value: float = self.plane.side_check(p=v2.edge.twin.origin.coords)
 
-            v1_side_value: float = self.plane.side_check(v1.edge.twin.origin.coords)
-            v2_side_value: float = self.plane.side_check(v2.edge.twin.origin.coords)
-
+            # Prüfung, in welche Richting v1 und v2 zeigen
             position_case: Position_Cases = None
             if v1_side_value > 0 and v2_side_value < 0:
                 position_case = Position_Cases.V1_POS_V2_NEG
@@ -73,37 +97,49 @@ class Intersection_Circle(DCEL):
             else:
                 position_case = Position_Cases.V1_POS_V2_POS
 
-            if (v1.intersection_data != None and v1.intersection_data.is_Multi) and (v2.intersection_data != None and v2.intersection_data.is_Multi):
+            # v1 und v2 sind Mehrfachschnittpunkt
+            if (v1.intersection_data != None and v1.intersection_data.is_Multi) and (
+                v2.intersection_data != None and v2.intersection_data.is_Multi
+            ):
                 continue
-            elif (v1.intersection_data != None and v1.intersection_data.is_Multi):
+            # Fall v1 Mehrfachschnittpunkt
+            elif v1.intersection_data != None and v1.intersection_data.is_Multi:
                 if v1.edge.twin.next == v1.edge:
                     insert_case = Insert_Cases.FIRST
-                    print("Case: First")
                 else:
                     insert_case = Insert_Cases.NORMAL
-                    print("Case: Normal")
-                multi_edges.append(Multi_Vertex_Edge(v1,e1))
-            elif (v2.intersection_data != None and v2.intersection_data.is_Multi):
+            # Fall v2 Mehrfachschnittpunkt
+            elif v2.intersection_data != None and v2.intersection_data.is_Multi:
                 if v2.edge.twin.next == v2.edge:
                     insert_case = Insert_Cases.NORMAL
-                    print("Case: Normal")
                 else:
                     insert_case = Insert_Cases.LAST
-                    print("Case: Last")
-                multi_edges.append(Multi_Vertex_Edge(v2,e2))
 
-            self.handle_insert_case(v1=v1, v2=v2,
-                                    e1=e1, e2=e2,
-                                    insert_case=insert_case,
-                                    position_case=position_case)
-
+            # korrektes einfügen von e1 und e2
+            self.handle_insert_case(
+                v1=v1,
+                v2=v2,
+                e1=e1,
+                e2=e2,
+                insert_case=insert_case,
+                position_case=position_case,
+            )
 
             self.edges.append(e1)
             self.edges.append(e2)
 
-        return multi_edges
-
-    def handle_insert_case(self, v1: Vertex, v2: Vertex, e1: HalfEdge, e2: HalfEdge, insert_case: Insert_Cases, position_case: Position_Cases ) -> None:
+    def handle_insert_case(
+        self,
+        v1: Vertex,
+        v2: Vertex,
+        e1: HalfEdge,
+        e2: HalfEdge,
+        insert_case: Insert_Cases,
+        position_case: Position_Cases,
+    ) -> None:
+        """
+        Fügt e1 und e2 korrekt ein, wie in den zwölf Fällen von Kapitel 5.2.5 spezifiziert
+        """
         if position_case is Position_Cases.V1_POS_V2_NEG:
             if insert_case is Insert_Cases.NORMAL:
                 e2.next = v1.edge.twin.next
@@ -169,144 +205,98 @@ class Intersection_Circle(DCEL):
                 v2.edge.twin.next.twin.next = e2
                 v1.edge.twin.next = e1
 
-    def connect_normal_cases(self, v1: Vertex, v2: Vertex, e1:HalfEdge, e2: HalfEdge, first_insert:bool, last_insert:bool) -> None:
-        v1_side = self.plane.side_check(v1.intersection_data.owner.center)
-        v2_side = self.plane.side_check(v2.intersection_data.owner.center)
-
-        if (v1_side > 0 and v2_side > 0) or (v1_side < 0 and v2_side < 0):  # both from same sphere
-            if v1_side < 0 and v2_side < 0:  # both from s1
-                if last_insert:  # last
-                    e1.next = v2.edge.twin.next
-                    e2.next = v1.edge
-                    v2.edge.twin.next = e2
-                    v1.edge.twin.next.twin.next = e1
-                elif first_insert:  # first
-                    e1.next = v2.edge
-                    e2.next = v1.edge
-                    v2.edge.twin.next = e2
-                    v1.edge.twin.next = e1
-                else:  # normal
-                    e1.next = v2.edge
-                    e2.next = v1.edge
-                    v2.edge.twin.next = e2
-                    v1.edge.twin.next.twin.next = e1
-            else:
-                if last_insert:  # last
-                    e2.next = v1.edge.twin.next
-                    e1.next = v2.edge
-                    v2.edge.twin.next.twin.next = e2
-                    v1.edge.twin.next = e1
-                elif first_insert:  # first
-                    e2.next = v1.edge
-                    e1.next = v2.edge
-                    v2.edge.twin.next = e2
-                    v1.edge.twin.next = e1
-                else:  # normal
-                    e2.next = v1.edge.twin.next
-                    e1.next = v2.edge
-                    v2.edge.twin.next = e2
-                    v1.edge.twin.next = e1
-        else:
-            if v1_side > 0 and v2_side < 0:  # v1 blue, v2 red
-                if last_insert:  # last
-                    e2.next = v1.edge.twin.next
-                    e1.next = v2.edge.twin.next
-                    v2.edge.twin.next = e2
-                    v1.edge.twin.next = e1
-                elif first_insert:  # first
-                    e2.next = v1.edge
-                    e1.next = v2.edge
-                    v2.edge.twin.next = e2
-                    v1.edge.twin.next = e1
-                else:  # normal
-                    e2.next = v1.edge.twin.next
-                    e1.next = v2.edge
-                    v2.edge.twin.next = e2
-                    v1.edge.twin.next = e1
-            else:  # v1 red, v2 blue
-                if last_insert:  # last
-                    e2.next = v1.edge
-                    e1.next = v2.edge
-                    v2.edge.twin.next.twin.next = e2
-                    v1.edge.twin.next.twin.next = e1
-                elif first_insert:  # first
-                    e2.next = v1.edge
-                    e1.next = v2.edge
-                    try:
-                        v2.edge.twin.next = e2
-                    except AttributeError as e:
-                        print(e)
-                    v1.edge.twin.next = e1
-                else:  # normal
-                    e2.next = v1.edge
-                    e1.next = v2.edge
-                    v2.edge.twin.next = e2
-                    v1.edge.twin.next.twin.next = e1
-
     def fix_circle(self) -> None:
+        """
+        Die Methode kümmert sich darum, dass die nah aneinander liegenden
+        Schnittpunkte verschmolzen werden wie in Kapitel 5.2.7 beschrieben
+        """
 
         vertices_to_remove: list[Vertex] = []
 
+        # ermittlung des durchschnittlichen Abstands
         avg = self.get_average_distance()
 
-        # Merge points if needed
         DELTA = avg * 0.9
         i = 0
-        while (i < len(self.vertices)):
+        while i < len(self.vertices):
 
             v1 = self.vertices[i]
-            v2 = self.vertices[(i+1) % len(self.vertices)]
+            v2 = self.vertices[(i + 1) % len(self.vertices)]
 
-            d = np.linalg.norm(v2.coords - v1.coords)
-            if d < DELTA and v1.intersection_data.isMerged == False and v2.intersection_data.isMerged == False and v1.intersection_data.is_Multi == False and v2.intersection_data.is_Multi == False:
-                self.merge(v1,v2)
+            d = np.linalg.norm(v2.coords - v1.coords)  # Ermittlung des Abstands
+            if (
+                d < DELTA
+                and v1.intersection_data.isMerged == False
+                and v2.intersection_data.isMerged == False
+                and v1.intersection_data.is_Multi == False
+                and v2.intersection_data.is_Multi == False
+            ):
+                self.merge(v1=v1, v2=v2)  # Verschmelzen von v1 und v2
                 v1.intersection_data.isMerged = True
                 v2.intersection_data.isMerged = True
 
-                vertices_to_remove.append(v2) # v2 wird immer entfernt
+                vertices_to_remove.append(v2)  # v2 wird immer entfernt
 
                 i += 2
             else:
                 i += 1
 
+        # entfernen aller verschmolzenen v2
         for p in vertices_to_remove:
             self.vertices.remove(p)
 
     def get_average_distance(self) -> float:
+        """
+        Ermittlung des durchschnittlichen Abstands der Schnittpunkte
+        """
         sum = 0
         count = 0
         for i in range(len(self.vertices)):
             v1 = self.vertices[0]
-            v2 = self.vertices[(i+1) % len(self.vertices)]
+            v2 = self.vertices[(i + 1) % len(self.vertices)]
 
-            if v1.intersection_data.is_Multi == True and v2.intersection_data.is_Multi == True:
+            if (
+                v1.intersection_data.is_Multi == True
+                and v2.intersection_data.is_Multi == True
+            ):
                 continue
 
             d = np.linalg.norm(v2.coords - v1.coords)
             sum += d
             count += 1
 
-            print("Average distance: ", sum/count)
-            return sum/count
+        return sum / count
 
     def merge(self, v1: Vertex, v2: Vertex):
+        """
+        Verschmelzen der beiden Schnittpunkte v1 und v2 (Kapitel 5.2.7)
+        """
         v1_side_val = self.plane.side_check(v1.edge.twin.origin.coords)
         v2_side_val = self.plane.side_check(v2.edge.twin.origin.coords)
 
-        if (v1_side_val > 0 and v2_side_val > 0) or (v1_side_val < 0 and v2_side_val < 0):  # both from same sphere
+        if (v1_side_val > 0 and v2_side_val > 0) or (
+            v1_side_val < 0 and v2_side_val < 0
+        ):  # both from same sphere
             if v1_side_val < 0 and v2_side_val < 0:  # both from s1
-                self.mergeRedRed(v1,v2)
-            else: # both from s2
-                self.mergeBlueBlue(v1,v2)
+                # Fall v1 negativ v2 negativ
+                self.mergeRedRed(v1, v2)
+            else:  # both from s2
+                # Fall v1 positiv v2 positiv
+                self.mergeBlueBlue(v1, v2)
         else:
             if v1_side_val > 0 and v2_side_val < 0:  # v1 blue, v2 red
-                self.mergeBlueRed(v1,v2)
+                # Fall v1 positiv v2 negativ
+                self.mergeBlueRed(v1, v2)
             else:  # v1 red, v2 blue
-                self.mergeRedBlue(v1,v2)
+                # Fall v1 negativ v2 positiv
+                self.mergeRedBlue(v1, v2)
 
     def mergeRedRed(self, v1: Vertex, v2: Vertex):
+        """
+        Methode die den Fall v1 negativ v2 negativ verschmelzen behandelt
+        """
         # find case
-        if (v1.edge.next.origin == v2.edge.next.origin): # Case Dreieck
+        if v1.edge.next.origin == v2.edge.next.origin:  # Case Dreieck
 
             e1 = v1.edge
             e2 = e1.next
@@ -319,7 +309,7 @@ class Intersection_Circle(DCEL):
             v1.intersection_data.owner.edges.remove(e2)
 
             # verschiebe v1
-            v1.coords = (v1.coords + v2.coords)/2
+            v1.coords = (v1.coords + v2.coords) / 2
             v1.edge = e2.twin
 
             # korrigiere next
@@ -336,7 +326,7 @@ class Intersection_Circle(DCEL):
             self.edges.remove(r_e1)
             self.edges.remove(r_e2)
 
-        else: # Case Viereck
+        else:  # Case Viereck
 
             e1 = v1.edge
             e2 = v2.edge
@@ -345,7 +335,7 @@ class Intersection_Circle(DCEL):
             r_e2 = r_e1.twin
 
             # V1 verschieben
-            v1.coords = (v1.coords + v2.coords)/2
+            v1.coords = (v1.coords + v2.coords) / 2
             v1.edge = e2
 
             # korrigiere next
@@ -360,8 +350,11 @@ class Intersection_Circle(DCEL):
             self.edges.remove(r_e2)
 
     def mergeBlueBlue(self, v1: Vertex, v2: Vertex):
+        """
+        Methode die den Fall v1 positiv v2 positiv verschmelzen behandelt
+        """
         # find case
-        if (v1.edge.next.origin == v2.edge.next.origin): # Case Dreieck
+        if v1.edge.next.origin == v2.edge.next.origin:  # Case Dreieck
 
             e1 = v1.edge
             e2 = v2.edge
@@ -374,7 +367,7 @@ class Intersection_Circle(DCEL):
             v1.intersection_data.owner.edges.remove(e2.next)
 
             # V1 verschieben
-            v1.coords = (v1.coords + v2.coords)/2
+            v1.coords = (v1.coords + v2.coords) / 2
             v1.edge = e1
 
             # korrigiere next
@@ -390,7 +383,7 @@ class Intersection_Circle(DCEL):
             self.edges.remove(r_e1)
             self.edges.remove(r_e2)
 
-        else: # Case Viereck
+        else:  # Case Viereck
 
             e1 = v1.edge
             e2 = v2.edge
@@ -399,7 +392,7 @@ class Intersection_Circle(DCEL):
             r_e1 = r_e2.twin
 
             # verschiebe V1
-            v1.coords = (v1.coords + v2.coords)/2
+            v1.coords = (v1.coords + v2.coords) / 2
 
             # korrigiere next
             e1.twin.next = e2
@@ -413,6 +406,9 @@ class Intersection_Circle(DCEL):
             self.edges.remove(r_e2)
 
     def mergeBlueRed(self, v1: Vertex, v2: Vertex):
+        """
+        Methode die den Fall v1 positiv v2 negativ verschmelzen behandelt
+        """
 
         e1 = v1.edge
         e2 = v2.edge
@@ -421,7 +417,7 @@ class Intersection_Circle(DCEL):
         r_e2 = r_e1.twin
 
         # v1 verschieben
-        v1.coords = (v1.coords + v2.coords)/2
+        v1.coords = (v1.coords + v2.coords) / 2
 
         # korrigiere next
         e2.twin.next = r_e1.next
@@ -437,56 +433,68 @@ class Intersection_Circle(DCEL):
         v1.intersection_data.extra_edge = e2
 
     def mergeRedBlue(self, v1: Vertex, v2: Vertex):
+        """
+        Methode die den Fall v1 negativ v2 positiv verschmelzen behandelt
+        """
         # definiere Variablen
 
-            e1 = v1.edge
-            e2 = v2.edge
+        e1 = v1.edge
+        e2 = v2.edge
 
-            r_e1 = e2.twin.next.twin.next
-            r_e2 = r_e1.twin
+        r_e1 = e2.twin.next.twin.next
+        r_e2 = r_e1.twin
 
-            # v1 verschieben
-            v1.coords = (v1.coords + v2.coords)/2
+        # v1 verschieben
+        v1.coords = (v1.coords + v2.coords) / 2
 
-            # korrigiere next
-            e1.twin.next.twin.next = e2
-            e2.twin.next.twin.next = e1
+        # korrigiere next
+        e1.twin.next.twin.next = e2
+        e2.twin.next.twin.next = e1
 
-            # korrigiere origin
-            e2.origin = v1
-            e2.twin.next.origin = v1
+        # korrigiere origin
+        e2.origin = v1
+        e2.twin.next.origin = v1
 
-            self.edges.remove(r_e1)
-            self.edges.remove(r_e2)
+        self.edges.remove(r_e1)
+        self.edges.remove(r_e2)
 
-            v1.intersection_data.extra_edge = e2
+        v1.intersection_data.extra_edge = e2
 
-    def alt_triangulate(self) -> None:
+    def restore_triangulation(self) -> None:
+        """
+        Methode die die Triangulierung wiederherstellt (Kapitel 5.2.6)
+        """
         for edge in self.edges:
             edges = self.find_all_edges(edge)
             if len(edges) > 2:
                 self.triangulate_helper(edges)
 
     def triangulate_helper(self, edges: list[HalfEdge]) -> None:
+        """
+        Hilfsmethode für die Triangulering, die ermittelt,
+        zu welcher Kugel die neuen Halbkanten gehören und rotiert die Liste
+        """
         counter = 0
-        while(edges[1].origin.intersection_data is not None):
+        # rotieren der Liste
+        while edges[1].origin.intersection_data is not None:
             if counter > 10:
+                # Wenn nach 10x nicht fertig, abbrechen
                 print("Case rotate does not work!", edges)
                 return
             first = edges.pop(0)
             edges.append(first)
             counter += 1
 
-        # irgendwie die seite finden
+        # ermittlung die Seite, damit die Kanten der richtigen Kugel zugewiesen werden können
         x = y = z = 0
         for edge in edges:
             x += edge.origin.coords[0]
             y += edge.origin.coords[1]
             z += edge.origin.coords[2]
-        m = [x/len(edges), y/len(edges), z/len(edges)]
+        m = [x / len(edges), y / len(edges), z / len(edges)]
 
-        m_side = self.plane.side_check(m)
-        s1_side = self.plane.side_check(self.plane.s1.center)
+        m_side = self.plane.side_check(p=m)
+        s1_side = self.plane.side_check(p=self.plane.s1.center)
 
         if (m_side < 0 and s1_side < 0) or (m_side > 0 and s1_side > 0):
             self.triangulate(edges=edges, dcel=self.plane.s1)
@@ -494,6 +502,9 @@ class Intersection_Circle(DCEL):
             self.triangulate(edges=edges, dcel=self.plane.s2)
 
     def find_all_edges(self, start_edge: HalfEdge) -> list[HalfEdge]:
+        """
+        Ermittelt ausgehend einer Schnittkante im Kreis herum alle Halbkanten für die Triangulerung
+        """
         edges = [start_edge]
         next = start_edge.next
         MAX_ITERATIONS = 10
@@ -506,55 +517,72 @@ class Intersection_Circle(DCEL):
             next = next.next
             counter += 1
 
-        # for edge in edges:
-        #     if edge.origin.intersection_data is not None and edge.origin.intersection_data.is_Multi:
-        #         return []
+        for edge in edges:
+            if (
+                edge.origin.intersection_data is not None
+                and edge.origin.intersection_data.is_Multi
+            ):
+                return []
 
         return edges
 
     def triangulate(self, edges: list[HalfEdge], dcel: DCEL):
-            # print("triangulate", len(edges))
-            if len(edges) > 3:
-                # definiere Variablen
+        """
+        Rekursive Methode, die die Triangulierung innerhalb der gegeben Liste von Halbkanten wiederherstellt
+        """
+        if len(edges) > 3:
+            # definiere Variablen
 
-                e_second = edges[1]
-                e_first = edges.pop(0)
-                e_last = edges.pop(-1)
+            e_second = edges[1]
+            e_first = edges.pop(0)
+            e_last = edges.pop(-1)
 
-                # neue Kanten erstellen
-                h1 = HalfEdge(origin=e_second.origin)
-                h2 = HalfEdge(origin=e_last.origin)
+            # neue Kanten erstellen
+            h1 = HalfEdge(origin=e_second.origin)
+            h2 = HalfEdge(origin=e_last.origin)
 
-                # setze twin
-                h1.twin = h2
-                h2.twin = h1
+            # setze twin
+            h1.twin = h2
+            h2.twin = h1
 
-                # setze next
-                e_first.next = h1
-                h1.next = e_last
+            # setze next
+            e_first.next = h1
+            h1.next = e_last
 
-                edges[-1].next = h2
-                h2.next = e_second
+            edges[-1].next = h2
+            h2.next = e_second
 
-                # h1 und h2 in s einfügen
-                dcel.add_edge(h1)
-                dcel.add_edge(h2)
+            # h1 und h2 in s einfügen
+            dcel.add_edge(h1)
+            dcel.add_edge(h2)
 
-                # h2 in liste setzen, damit algo rekursiv weiter laufen kann
-                edges.insert(0,h2)
+            # h2 in liste setzen, damit algo rekursiv weiter laufen kann
+            edges.insert(0, h2)
 
-                self.triangulate(edges, dcel)
+            self.triangulate(edges=edges, dcel=dcel)
 
     def get_circle_traces(self, color: str) -> go.Scatter3d:
+        """
+        Hilfsmethode um die Halbkanten des Schnittkreises zu plotten
+        """
         return super().get_line_trace(color, self.name)
 
     def get_point_traces(self, color: str) -> go.Scatter3d:
+        """
+        Hilfsmethode um die Schnittpunkte zu plotten
+        """
         return super().get_point_trace(color, self.name)
 
-    def remove_part(self, plane: Intersection_Plane, circle: bool = False) -> None:
-        return super().remove_part(plane=plane,plane_side_val= -1 ,circle=True)
+    def remove_part(self, plane: IntersectionPlane, circle: bool = False) -> None:
+        """
+        Methode um den Teil des Schnittkreises zu entfernen, der auf der anderen Seite der Ebene liegt
+        """
+        return super().remove_part(plane=plane, plane_side_val=-1, circle=True)
 
-    def remove_points(self, plane: Intersection_Plane, plane_side_val: float) -> None:
+    def remove_points(self, plane: IntersectionPlane, plane_side_val: float) -> None:
+        """
+        Entfernt alle Schnittpunkte des Schnittkreises, die nicht das gleiche Vorzeichen wie plane_side_val haben
+        """
 
         keep_points: list[Vertex] = []
         remove_points: list[Vertex] = []
@@ -563,9 +591,11 @@ class Intersection_Circle(DCEL):
                 keep_points.append(v)
                 continue
             else:
-                v_val = plane.side_check(v.coords)
+                v_val = plane.side_check(p=v.coords)
 
-                if (plane_side_val < 0 and v_val < 0) or (plane_side_val > 0 and v_val > 0):
+                if (plane_side_val < 0 and v_val < 0) or (
+                    plane_side_val > 0 and v_val > 0
+                ):
                     keep_points.append(v)
                     continue
             remove_points.append(v)

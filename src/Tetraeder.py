@@ -2,10 +2,14 @@ from Dcel import DCEL, Vertex, HalfEdge, Face
 import numpy as np
 
 
-def build(c: list[float] = [0,0,0], r: float = 1.0) -> DCEL:
+def build(c: list[float] = [0, 0, 0], r: float = 1.0) -> DCEL:
+    """
+    Erzeugt den initialen Tetraeder
+    """
+
     dcel = DCEL()
 
-    vertices = _get_tetraeder_points(c,r)
+    vertices = _get_tetraeder_points(c, r)
 
     p1 = Vertex(vertices[0])
     p2 = Vertex(vertices[1])
@@ -121,18 +125,19 @@ def build(c: list[float] = [0,0,0], r: float = 1.0) -> DCEL:
 
     return dcel
 
+
 def _get_tetraeder_points(c: list[float], r: float) -> list[list[float]]:
-  a = 1  # initiale Größe
-  p1 = np.array([0, 0, 0])
-  p2 = np.array([a, 0, 0])
-  p3 = np.array([a / 2, a * np.sqrt(3) / 2, 0])
-  p4 = np.array([a / 2, a * np.sqrt(1 / 12), a * np.sqrt(2 / 3)])
+    a = 1  # initiale Größe
+    p1 = np.array([0, 0, 0])
+    p2 = np.array([a, 0, 0])
+    p3 = np.array([a / 2, a * np.sqrt(3) / 2, 0])
+    p4 = np.array([a / 2, a * np.sqrt(1 / 12), a * np.sqrt(2 / 3)])
 
-  # Zentrum der Punkte
-  center = (p1 + p2 + p3 + p4) / 4
+    # Zentrum der Punkte
+    center = (p1 + p2 + p3 + p4) / 4
 
-  # Punkte auf 0,0,0 schieben
-  adjusted_points = [p - center for p in [p1, p2, p3, p4]]
-  # Punkte auf Radius der Kugel setzen
-  vertices = [(np.array(c) + (r / np.linalg.norm(pt)) * pt) for pt in adjusted_points]
-  return vertices
+    # Punkte auf 0,0,0 schieben
+    adjusted_points = [p - center for p in [p1, p2, p3, p4]]
+    # Punkte auf Radius der Kugel setzen
+    vertices = [(np.array(c) + (r / np.linalg.norm(pt)) * pt) for pt in adjusted_points]
+    return vertices
