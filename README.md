@@ -1,24 +1,45 @@
 # van-der-waals-surface
 
+This is the code of my bachelor thesis: 'Van-der-Waals-Oberfläche von Molekülen'. The goal was to get the van-der-waals surface of molecules. Three moleculs got created:
+- Water
+- Methan
+- Ethan
 
-create the virtual environment with:
+They can be found under /src.
+
+## Setting up a virtual environment
+
+create a virtual environment with:
 ```
-  python3 -m venv .venv
+python3 -m venv .venv
+```
+In the terminal, the environment can be activated as follows:
+
+**Windows:**
+```
+myenv\Scripts\activate
 ```
 
-# Activate the environment:
-
-## Windows:
+**Mac/Linus**
 ```
-  myenv\Scripts\activate
+source myenv/bin/activate
 ```
 
-## Mac/Linus
+Install the dependencies:
 ```
-  source myenv/bin/activate
+pip install -r requirements.txt
 ```
 
-# Install Dependencies:
+## Run the Molecules
+**Water:**
+```bash
+python src/Wasser.py
 ```
-  pip install -r requirements.txt
+**Methan:**
+```bash
+python src/Methan.py
+```
+**Ethan:**
+```bash
+python src/Ethan.py
 ```
