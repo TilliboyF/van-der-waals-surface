@@ -2,6 +2,10 @@ import numpy as np
 
 
 class Plane:
+    """
+    Klasse einer Ebene
+    """
+
     def __init__(self):
         self.p: list[float] = []
         self.alpha: float = 0
@@ -18,6 +22,9 @@ class Plane:
 
 
 class IntersectionPlane(Plane):
+    """
+    Klasse der Schnittebene
+    """
 
     def __init__(self, s1: "Sphere", s2: "Sphere") -> None:
         super().__init__()
@@ -28,6 +35,9 @@ class IntersectionPlane(Plane):
     def _calculate_plane(
         self, c1: list[float], c2: list[float], r1: float, r2: float
     ) -> None:
+        """
+        Berechnet die Schnittebene
+        """
 
         d = np.array(c2) - np.array(c1)
         length_of_d = np.linalg.norm(d)
@@ -42,6 +52,11 @@ class IntersectionPlane(Plane):
         self.delta = d[0] * self.p[0] + d[1] * self.p[1] + d[2] * self.p[2]
 
     def calculate_intersection(self, v1: "Vertex", v2: "Vertex") -> float:
+        """
+        Berechnet, ob ein Kantenstück die Schnittebene schneidet:
+            Wenn t >= 0 und t <= 1 -> Schnitt,
+            sonst -> Kein Schnitt
+        """
         v = v2.coords - v1.coords
 
         t = (
@@ -67,4 +82,7 @@ class IntersectionPlane(Plane):
         return t / b
 
     def side_check(self, p: list[float]) -> float:
+        """
+        Der Seitentest der Ebene
+        """
         return self.alpha * p[0] + self.beta * p[1] + self.gamma * p[2] - self.delta

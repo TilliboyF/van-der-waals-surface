@@ -12,6 +12,7 @@ class Sphere(DCEL):
         r: float = 1.0,
         name: str = "",
         color: str = "",
+        triangulate: bool = True,
     ) -> None:
         super().__init__(center=c, color=color)
         self.r = r
@@ -20,14 +21,15 @@ class Sphere(DCEL):
         self.faces = dcel.faces
         self.vertices = dcel.vertices
         self.name = name
+        if triangulate:
+            self.triangulate()
 
     def __eq__(self, value: object) -> bool:
         return self.name == value.name
 
     # Die Hauptmethode, die vollständig für das triangulieren zuständig ist und dafür sorgt, wie oft trianguliert werden soll.
-    def triangulate(self, n: int = 1):
+    def triangulate(self, n: int = 4):
         for i in range(n - 1):
-            print("tria")
             self._stepTriangulte(i == 0)
 
     # die Methode, welche einmal trianguliert
