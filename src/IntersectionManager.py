@@ -146,8 +146,6 @@ class Intersection_Manager:
         s1.remove_part(plane=plane, plane_side_val=-1)
         s2.remove_part(plane=plane, plane_side_val=1)
 
-        circle.sort_intersection_points()
-
         return circle
 
     def get_line_traces(self) -> list[go.Scatter3d]:

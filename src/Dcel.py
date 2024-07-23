@@ -269,7 +269,6 @@ class DCEL:
                         keep_edges.append(edge)
                         keep_edges.append(edge.twin)
                         continue
-
                 else:
                     if (
                         edge.origin.intersection_data != None

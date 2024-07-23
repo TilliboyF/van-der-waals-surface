@@ -75,7 +75,7 @@ class IntersectionPlane(Plane):
                 - self.delta
                 == 0
             ):
-                return v1.coords
+                return 0
             else:
                 return 100
 
